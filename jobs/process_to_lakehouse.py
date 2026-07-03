@@ -4,7 +4,7 @@ from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType, BooleanType
 
 # 1. สร้าง Spark Session และโหลด Library ที่ต้องใช้ (Kafka, Delta, MinIO/AWS S3)
-print("🚀 Starting Spark Session (This will download required jars for the first time)...")
+print(" Starting Spark Session (This will download required jars for the first time)...")
 spark = SparkSession.builder \
     .appName("CryptoLakehouseProcessor") \
     .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,io.delta:delta-spark_2.12:3.2.0,org.apache.hadoop:hadoop-aws:3.3.4") \
@@ -45,7 +45,7 @@ df_parsed = df_kafka.selectExpr("CAST(value AS STRING)") \
 # เพิ่มคอลัมน์เวลาให้เป็น TimeStamp 
 df_final = df_parsed.withColumn("trade_timestamp", (col("trade_time") / 1000).cast("timestamp"))
 
-print("📡 Streaming data from Kafka to MinIO (Delta Lake format)...")
+print(" Streaming data from Kafka to MinIO (Delta Lake format)...")
 
 # 6. เขียนข้อมูลลง MinIO ในรูปแบบ Delta Lake (Data Lakehouse)
 query = df_final \
