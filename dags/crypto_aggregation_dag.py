@@ -6,7 +6,7 @@ import duckdb
 import pandas as pd
 
 def run_lakehouse_analytics():
-    print("🚀 Starting Data Lakehouse Analytics using DuckDB...")
+    print(" Starting Data Lakehouse Analytics using DuckDB...")
     
     # เชื่อมต่อ DuckDB และตั้งค่าเชื่อมต่อกับ MinIO (S3)
     conn = duckdb.connect()
@@ -56,7 +56,7 @@ def run_lakehouse_analytics():
     # - index=False แปลว่าไม่ต้องเอาเลข Row Index (0,1,2,3...) ไปใส่ใน Database
     df_result.to_sql(name='crypto_summary', con=engine, if_exists='replace', index=False)
     
-    print("✅ Successfully updated 'crypto_summary' table in PostgreSQL!")
+    print(" Successfully updated 'crypto_summary' table in PostgreSQL!")
     
     return "Analytics completed successfully"
     
