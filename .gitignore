@@ -1,0 +1,22 @@
+# Data and Storage
+data/
+minio_data/
+postgres_data/
+zookeeper_data/
+kafka_data/
+
+# Logs
+logs/
+airflow-logs/
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp

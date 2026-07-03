@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # 1. MinIO (S3 Alternative for Lakehouse)
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  # 2. Zookeeper (Required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  # 3. Kafka (Message Broker)
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # 4. Spark Master
+  spark-master:
+    image: bitnamilegacy/spark:3.5.1
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "8080:8080" # Spark Master UI
+      - "7077:7077"
+    volumes:
+      - ./jobs:/opt/bitnami/spark/jobs
+
+  # 5. Spark Worker
+  spark-worker:
+    image: bitnamilegacy/spark:3.5.1
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    depends_on:
+      - spark-master
+    volumes:
+      - ./jobs:/opt/bitnami/spark/jobs
+
+  # 6. PostgreSQL (Airflow Backend DB)
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow_password
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+
+  # 7. Airflow Init (Runs once to setup DB and Admin user)
+  airflow-init:
+    image: apache/airflow:2.9.2
+    container_name: airflow-init
+    depends_on:
+      - postgres
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow_password@postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    entrypoint: >
+      bash -c "
+      airflow db migrate &&
+      airflow users create --role Admin --username admin --password admin --email admin@example.com --firstname Admin --lastname User
+      "
+
+  # 8. Airflow Webserver (UI)
+  airflow-webserver:
+    image: apache/airflow:2.9.2
+    container_name: airflow-webserver
+    depends_on:
+      - postgres
+      - airflow-init
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow_password@postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - _PIP_ADDITIONAL_REQUIREMENTS=deltalake duckdb
+    ports:
+      - "8081:8080" # Access Airflow UI on port 8081 (to avoid conflict with Spark)
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - ./jobs:/opt/airflow/jobs
+    command: webserver
+
+  # 9. Airflow Scheduler (Executes DAGs)
+  airflow-scheduler:
+    image: apache/airflow:2.9.2
+    container_name: airflow-scheduler
+    depends_on:
+      - postgres
+      - airflow-init
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow_password@postgres/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - _PIP_ADDITIONAL_REQUIREMENTS=deltalake duckdb
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - ./jobs:/opt/airflow/jobs
+    command: scheduler
+
+volumes:
+  minio_data:
