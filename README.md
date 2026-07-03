@@ -108,7 +108,7 @@ docker exec -it spark-master spark-submit \
    - **User:** `airflow`
    - **Password:** `airflow_password`
 4. Load the `crypto_summary` table and create your interactive dashboard!
-
+dashboards/images/Crypto Lakehouse Dashboard_page-0001.jpg
 ## 📊 Analytics Output Example
 Using DuckDB to query the Delta Lake directly without a database engine:
 ```text
